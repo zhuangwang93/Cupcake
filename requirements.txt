@@ -1,0 +1,6 @@
+torch
+horovod
+tensorboardX
+numpy
+tqdm
+cupy-cuda101
