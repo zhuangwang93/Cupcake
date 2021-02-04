@@ -56,7 +56,7 @@ sudo docker run -it --privileged -v ~/mergeComp:/home --net host --gpus all imag
 
 ### Download mergeComp
 ```shell script
-git clone xxxx
+git clone https://github.com/Crystal-wxy/mergeComp.git
 ```
 
 ### CMake and OpenMPI [Optional]
