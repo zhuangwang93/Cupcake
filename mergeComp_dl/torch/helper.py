@@ -54,9 +54,6 @@ def grace_from_params(params):
     elif comp == 'terngrad':
         from mergeComp_dl.torch.compressor.poolterngrad import PoolTernGradCompressor
         compressor = PoolTernGradCompressor(device=device)
-    elif comp == 'threshold':
-        from mergeComp_dl.torch.compressor.poolthreshold import PoolThresholdCompressor
-        compressor = PoolThresholdCompressor(threshold=ratio)
     elif comp == 'topk':
         from mergeComp_dl.torch.compressor.pooltopk import PoolTopKCompressor
         compressor = PoolTopKCompressor(compress_ratio=ratio)
@@ -76,9 +73,6 @@ def grace_from_params(params):
         elif mem == 'residual':
             from mergeComp_dl.torch.memory.poolresidual import PoolResidualMemory
             memory = PoolResidualMemory(model_params, fusion_num=fusion_num)
-        elif mem == '1bitadam':
-            from mergeComp_dl.torch.memory.pool1bitadam import Pool1BitAdamMemory
-            memory = Pool1BitAdamMemory(model_params, fusion_num=fusion_num)
         else:
             raise NotImplementedError(mem)
     elif fusion_num == 0:
@@ -101,8 +95,8 @@ def grace_from_params(params):
         from mergeComp_dl.torch.communicator.pool_allreduce import PoolAllreduce
         return PoolAllreduce(compressor, memory)
     elif comm == 'allgather':
-        from mergeComp_dl.torch.communicator.pool_allgather import PoolAllgather
-        return PoolAllgather(compressor, memory)
+        from mergeComp_dl.torch.communicator.DDP_allgather import DDPAllgather
+        return DDPAllgather(compressor, memory)
     elif comm == 'ps':
         from mergeComp_dl.torch.communicator.pool_ps import PoolPS
         return PoolPS(compressor, memory)

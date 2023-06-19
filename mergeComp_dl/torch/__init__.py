@@ -59,19 +59,8 @@ class Communicator(ABC):
 
 
     def send_step(self, tensor, name):
-        tensor, meta = self.memory.pool_compensate(tensor, name)
-        if tensor is not None:
-            tensor_compressed, ctx = self.compressor.compress(tensor, name, meta)
-            self.memory.pool_update(tensor, name, self.compressor, tensor_compressed, ctx)
-            handles = self.async_send(tensor_compressed, ctx)
-            return handles, ctx
-
-        return False, None
+        return self.async_send(tensor, name)
 
 
     def receive_step(self, handles, ctx):
-        name = ctx[0]
-        tensors = self.wait_receive(handles, ctx)
-        if tensors is not None:
-            self.memory.reduce(tensors, name)
-        self.memory.pool_step(name)
+        self.wait_receive(handles, ctx)
