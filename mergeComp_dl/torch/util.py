@@ -3,9 +3,10 @@ from torch.utils.dlpack import to_dlpack
 from torch.utils.dlpack import from_dlpack
 import cupy
 
+# Bool type is not supported by dlpack
 
 def torch2cupy(tensor):
-    return cupy.fromDlpack(to_dlpack(tensor))
+    return cupy.fromDlpack(to_dlpack(tensor.type(torch.uint8)))
 
 
 def cupy2torch(cupy_tensor):

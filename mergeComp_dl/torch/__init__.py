@@ -63,4 +63,8 @@ class Communicator(ABC):
 
 
     def receive_step(self, handles, ctx):
-        self.wait_receive(handles, ctx)
+        name = ctx[0]
+        tensor = self.wait_receive(handles, ctx)
+        if tensor is not None:
+            self.memory.reduce(tensor, name)
+            self.memory.pool_step(name)

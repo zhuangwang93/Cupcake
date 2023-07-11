@@ -86,7 +86,7 @@ class MemoryPool(Memory):
                 last_offset = offset
                 last_name_offset = name_offset
                 fusion_index += 1
-        #print(self.compress_name)
+        print(self.compress_name)
 
 
     def clean(self):
@@ -149,6 +149,7 @@ class MemoryPool(Memory):
             self.compensate(None, name)
             offset, _ = self.compress_name[name]
             start, end = offset
+            print(name, start, end)
             return self.velocities[start:end], start
         else:
             return None, None
