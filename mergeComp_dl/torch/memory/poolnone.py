@@ -19,10 +19,6 @@ class PoolNoneMemory(MemoryPool):
         """Update the residuals."""
         pass
 
-    def reduce(self, ctx, name):
+    def reduce(self, tensor, name):
         reduction = self.get_reduction(name)
-        reduction.zero_()
-        # TODO:for compression algorithms with allreduce, the received results have been averaged already.
-        # Probably there is no need to divide c with self.world_size.
-        for c in ctx:
-            reduction.add_(c/self.world_size)
+        reduction.set_(tensor/self.world_size)

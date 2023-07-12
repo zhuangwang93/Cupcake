@@ -1,6 +1,7 @@
 import torch
 import random
-import math
+from math import ceil
+
 
 from mergeComp_dl.torch import Compressor
 
@@ -39,7 +40,7 @@ class PoolDgcCompressor(Compressor):
         else:
             self.warmup_coeff = 1
         self.attributes = (self.sample_ratio, self.base_compress_ratio)
-        self.num_selects = 4*1024*1024
+        self.num_selects = 4 * 1024 * 1024
         self.indices = torch.zeros(self.num_selects, dtype=torch.int32).cuda()
         self.zeros = {}
         self.masks = {}
@@ -65,31 +66,30 @@ class PoolDgcCompressor(Compressor):
         self.attributes = sample_ratio, ratio
 
 
-    def _sparsify(self, tensor, name):
+    def _sparsify(self, tensor):
         sample_ratio, compress_ratio = self.attributes
         numel = tensor.numel()
 
-        # TODO: handle small tensor
-        if numel <= 128:
-            sample_ratio = 0.1
-            compress_ratio = 0.1
-        elif numel <= 1024:
+        if numel < 1024*16:
+            k = ceil(numel * compress_ratio)
+            _, indices = torch.topk(tensor.abs(), k)
+            values = tensor[indices]
+            return values, indices, numel, None
+
+        if numel <= 1024*1024:
             sample_ratio = 0.01
 
         num_samples = int(numel * sample_ratio)
         num_selects = int(numel * compress_ratio)
 
-        if numel == num_samples:
-            samples = importance
+        if self.strided_sample:
+            sample_stride = int(1 // sample_ratio)
+            sample_start = random.randint(0, min(sample_stride, numel-1))
+            samples = tensor[sample_start::sample_stride]
         else:
-            if self.strided_sample:
-                sample_stride = int(1 // sample_ratio)
-                sample_start = random.randint(0, min(sample_stride, numel-1))
-                samples = tensor[sample_start::sample_stride]
-            else:
-                samples = tensor[torch.randint(0, numel, (num_samples, ), device=tensor.device)]
+            samples = tensor[torch.randint(0, numel, (num_samples, ), device=tensor.device)]
 
-        k = max(1, int(num_samples * compress_ratio))
+        k = ceil(num_samples * compress_ratio * 1.1)
         thr = torch.min(torch.topk(samples.abs(), k, 0, largest=True, sorted=False)[0])
 
         mask = tensor.abs() >= thr
@@ -106,55 +106,31 @@ class PoolDgcCompressor(Compressor):
             selected = mask.sum()
 
         indices, = torch.where(mask)
-        values = tensor[indices]
-
-        return values, indices.type(torch.int32), mask, numel, num_selects
-
-
-    def compress(self, tensor, name, start):
-        sample_ratio, compress_ratio = self.attributes
-        if compress_ratio < 1.0:
-            # if fused tensors are not ready, NOT call communicate()
-            if tensor is None:
-                return None, name
-
-            values, indices, mask, numel, num_selects = \
-                self._sparsify(tensor, name)
-
-            ctx = (name, mask, numel, num_selects, values.dtype, indices.dtype)
-            if self.fp16_values and values.dtype.is_floating_point:
-                values = values.type(torch.float16)
-
-            if self.int32_indices and not indices.dtype.is_floating_point:
-                indices = indices.type(torch.int32)
-
-            return (values, indices), ctx
+        if indices.numel() >= num_selects:
+            indices = indices[:num_selects]  
         else:
-            ctx = (name, None, None, tensor.dtype, None)
-            if self.fp16_values and tensor.dtype.is_floating_point:
-                tensor = tensor.type(torch.float16)
-            return tensor, ctx
+            indices = torch.randint(0, numel, (num_selects,), device=tensor.device, dtype=torch.int64)
+
+        values = tensor[indices]
+        return values, indices.type(torch.int32), numel, num_selects
+
+
+    def compress(self, tensor, name):
+        sample_ratio, compress_ratio = self.attributes
+        # if fused tensors are not ready, NOT call communicate()
+        if tensor is None:
+            return None, name
+        values, indices, numel, num_selects = self._sparsify(tensor)
+        ctx = (name, numel, num_selects, values.dtype, indices.dtype)
+        return (values, indices), ctx
 
 
     def decompress(self, tensor_compressed, ctx):
         sample_ratio, compress_ratio = self.attributes
-        if compress_ratio < 1.0:
-            name, mask, numel, num_selects, vdtype, idtype = ctx
-            # decompress
-            values, indices = tensor_compressed
+        name, numel, num_selects, vdtype, idtype = ctx
+        # decompress
+        values, indices = tensor_compressed
+        tensor_decompressed = torch.zeros(numel, dtype=values.dtype, device=values.device)
+        tensor_decompressed.scatter_(0, indices.type(torch.int64), values)
 
-            if self.fp16_values and vdtype.is_floating_point:
-                values = values.type(vdtype)
-            if self.int32_indices and not idtype.is_floating_point:
-                indices = indices.type(idtype)
-
-            name, mask, numel, num_selects, vdtype, idtype = ctx
-            values, indices = tensor_compressed
-            tensor_decompressed = torch.zeros(numel, dtype=values.dtype, device=values.device)
-            tensor_decompressed.scatter_(0, indices.type(torch.int64), values)
-
-            return tensor_decompressed
-        else:
-            if self.fp16_values and vdtype.is_floating_point:
-                tensor = tensor.type(vdtype)
-            return tensor
+        return tensor_decompressed

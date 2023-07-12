@@ -30,7 +30,9 @@ class DDPAllgather(Communicator):
         # we decompresss compressed tensors from the GPUs with the same local ID on different nodes
         # Because they are compressed from the same position range, we can sum the decompressed tensors
         if self.is_topk_like:
-            return self.compressor.decompress(tensors_compressed, ctx)
+            tensors, metadata = tensors_compressed
+            tensors, metadata = torch.stack(tensors).reshape(-1), torch.stack(metadata).reshape(-1)
+            return self.compressor.decompress((tensors, metadata), ctx)
 
         tensors, metadata = tensors_compressed
         if not isinstance(tensors, list):

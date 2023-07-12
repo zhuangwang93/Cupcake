@@ -26,8 +26,6 @@ class ResidualMemory(MemoryLayer):
         residual.copy_(tensor.view(-1) - tensor_decompressed)
 
 
-    def reduce(self, ctx, name):
+    def reduce(self, tensor, name):
         reduction = self.get_reduction(name)
-        reduction.zero_()
-        for c in ctx:
-            reduction.add_(c/self.world_size)
+        reduction.set_(tensor/self.world_size)

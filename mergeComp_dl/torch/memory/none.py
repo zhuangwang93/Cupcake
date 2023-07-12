@@ -19,8 +19,6 @@ class NoneMemory(MemoryLayer):
         """Update the residuals."""
         pass
 
-    def reduce(self, ctx, name):
+    def reduce(self, tensor, name):
         reduction = self.get_reduction(name)
-        reduction.zero_()
-        for c in ctx:
-            reduction.add_(c/self.world_size)
+        reduction.set_(tensor/self.world_size)
