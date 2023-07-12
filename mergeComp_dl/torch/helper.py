@@ -6,7 +6,7 @@ import horovod.torch as hvd
 def grace_from_params(params):
     comp = params.get('compressor', 'none')
     mem = params.get('memory', 'none')
-    comm = params.get('communicator', 'allgather')
+    comm = params.get('communicator', 'allreduce')
     model_params = params.get('params', 'none')
     ratio = params.get('ratio', 0.01)
     if model_params == 'none':
@@ -14,7 +14,6 @@ def grace_from_params(params):
     fusion_num = params.get('fusion_num', 2)
     momentum = params.get('momentum', 0.9)
     qsgd_quantum = params.get('quantum', 64)
-    device = torch.cuda.current_device()
     print("[Compression Setup] compressor: {}\n\tmemory: {}\n\tcommunicator: {}\n\tsparsity ratio: {}\n\tfusion num: {}".format(
         comp,
         mem,
@@ -29,7 +28,7 @@ def grace_from_params(params):
         compressor = PoolDgcCompressor(compress_ratio=ratio)
     elif comp == 'efsignsgd':
         from mergeComp_dl.torch.compressor.poolefsignsgd import PoolEFSignSGDCompressor
-        compressor = PoolEFSignSGDCompressor(device=device)
+        compressor = PoolEFSignSGDCompressor()
     elif comp == 'fp16':
         from mergeComp_dl.torch.compressor.poolfp16 import PoolFP16Compressor
         compressor = PoolFP16Compressor()
@@ -38,7 +37,7 @@ def grace_from_params(params):
         compressor = PoolNoneCompressor()
     elif comp == 'onebit':
         from mergeComp_dl.torch.compressor.poolonebit import PoolOneBitCompressor
-        compressor = PoolOneBitCompressor(device=device)
+        compressor = PoolOneBitCompressor()
     elif comp == 'qsgd':
         from mergeComp_dl.torch.compressor.poolqsgd import PoolQSGDCompressor
         compressor = PoolQSGDCompressor(quantum_num=qsgd_quantum)
@@ -47,13 +46,13 @@ def grace_from_params(params):
         compressor = PoolRandomKCompressor(compress_ratio=ratio)
     elif comp == 'signsgd':
         from mergeComp_dl.torch.compressor.poolsignsgd import PoolSignSGDCompressor
-        compressor = PoolSignSGDCompressor(device=device)
+        compressor = PoolSignSGDCompressor()
     elif comp == 'signum':
         from mergeComp_dl.torch.compressor.poolsignum import PoolSignumCompressor
-        compressor = PoolSignumCompressor(momentum=momentum, device=device)
+        compressor = PoolSignumCompressor(momentum=momentum)
     elif comp == 'terngrad':
         from mergeComp_dl.torch.compressor.poolterngrad import PoolTernGradCompressor
-        compressor = PoolTernGradCompressor(device=device)
+        compressor = PoolTernGradCompressor()
     elif comp == 'topk':
         from mergeComp_dl.torch.compressor.pooltopk import PoolTopKCompressor
         compressor = PoolTopKCompressor(compress_ratio=ratio)

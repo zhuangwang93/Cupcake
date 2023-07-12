@@ -12,7 +12,7 @@ class PoolQSGDCompressor(Compressor):
         self.quantum_num = quantum_num
 
 
-    def compress(self, tensor, name, ctx, server=False):
+    def compress(self, tensor, name):
         shape = tensor.size()
         tensor = tensor.flatten()
         norm = tensor.norm().reshape((1,))
@@ -34,7 +34,7 @@ class PoolQSGDCompressor(Compressor):
         return tensor_compressed, ctx
 
 
-    def decompress(self, tensor_compressed, ctx, server=False):
+    def decompress(self, tensor_compressed, ctx):
         tensor, norm = tensor_compressed
         norm = norm[0]
         decode_output = tensor.type(torch.float32)

@@ -124,7 +124,22 @@ class DDPBackend():
         else:
             dist.all_gather(ret, tensor, group=comm_group)
         return ret
+    
 
+    def allgather_global(self, tensor, async_op=True):
+        if self.world_size == 1:
+            # print("Warning: the communication group size is 1", flush=True)
+            return tensor
+        
+        ret = [torch.empty_like(tensor) for _ in range(self.world_size)]
+        if async_op:
+            handle = dist.all_gather(ret, tensor, async_op=True)
+            # Wait ensures the operation is enqueued, but not necessarily complete.
+            handle.wait()
+        else:
+            dist.all_gather(ret, tensor)
+        return ret
+    
 
     def allgatherv(self, tensor, intra=False): 
         # tensor_sizes is the set of tensor sizes from all GPUs. The size can be different

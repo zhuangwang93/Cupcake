@@ -1,17 +1,16 @@
 import torch
-
 from mergeComp_dl.torch import Compressor
 from mergeComp_dl.torch.util import packbits, unpackbits
 
 
 class PoolEFSignSGDCompressor(Compressor):
-    def __init__(self, device):
+    def __init__(self):
         super().__init__()
         self.name = "EFSignSGD"
         self.quantization = True
 
 
-    def compress(self, tensor, name, ctx, server=False):
+    def compress(self, tensor, name):
         """Encoding and compressing the signs """
         numel = tensor.numel()
 
@@ -25,7 +24,7 @@ class PoolEFSignSGDCompressor(Compressor):
         return tensor_compressed, ctx
 
 
-    def decompress(self, tensor_compressed, ctx, server=False):
+    def decompress(self, tensor_compressed, ctx):
         """Decoding the signs to float format """
         int8_tensor, mean = tensor_compressed
         mean = mean[0]

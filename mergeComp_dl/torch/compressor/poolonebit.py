@@ -5,13 +5,13 @@ from mergeComp_dl.torch.util import packbits, unpackbits
 
 
 class PoolOneBitCompressor(Compressor):
-    def __init__(self, device):
+    def __init__(self):
         super().__init__()
         self.name = "PoolOneBit"
-        self.quantization = False
+        self.quantization = True
 
 
-    def compress(self, tensor, name, ctx, server=False):
+    def compress(self, tensor, name):
         numel = tensor.numel()
 
         mask0 = tensor < 0
@@ -35,12 +35,10 @@ class PoolOneBitCompressor(Compressor):
         return tensor_compressed, ctx
 
 
-    def decompress(self, tensor_compressed, ctx, server=False):
+    def decompress(self, tensor_compressed, ctx):
         int8_tensor, means = tensor_compressed
         mean0, mean1 = means[0], means[1]
         name, numel = ctx
-
-        uint8_tensor = unpackbits(int8_tensor, numel)
-
-        tensor_decompressed = uint8_tensor * mean0 + ~uint8_tensor * mean1
+        sign_decode = unpackbits(int8_tensor, numel)
+        tensor_decompressed = sign_decode * mean0 + ~sign_decode * mean1
         return tensor_decompressed

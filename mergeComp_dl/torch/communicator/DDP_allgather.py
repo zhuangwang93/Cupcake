@@ -14,10 +14,9 @@ class DDPAllgather(Communicator):
         self.local_rank = hvd.local_rank()
         self.local_size = hvd.local_size()
         self.world_size = hvd.size()
-        self.flat_comm = True
         self.worker_id = self.ddp.worker_id
-        # self.worker_num = self.ddp.worker_num
-        self.worker_num = self.world_size
+        self.worker_num = self.ddp.worker_num
+        self.flat_comm = (self.local_size == 1) or (self.worker_num == 1)
         self.comm_stream = torch.cuda.Stream()
         self.handles = {}
         self.shapes = {}
@@ -46,33 +45,30 @@ class DDPAllgather(Communicator):
     def async_send(self, tensor, name):    
         self.shapes[name] = tensor.size()
         tensor = tensor.flatten()
-        numel = tensor.numel()
 
         with torch.cuda.stream(self.comm_stream):
-            if not self.flat_comm:
+            if self.flat_comm:
+                intra_tensor = tensor
+            else:
                 # intra-node communication with reduce-scatter
                 intra_tensor = self.ddp.reduce_scatter(tensor, intra=True)
-            else:
-                intra_tensor = tensor
+
             compensated_tensor, meta = self.memory.pool_compensate(intra_tensor, name)
             if compensated_tensor is None:
                 self.handles[name] = None
                 return None, (name,)
             
-            tensor_compressed, ctx = self.compressor.compress(compensated_tensor, name, meta)
+            tensor_compressed, ctx = self.compressor.compress(compensated_tensor, name)
             self.memory.pool_update(compensated_tensor, name, self.compressor, tensor_compressed, ctx)
             
             # inter-node communication with allgather
             assert(len(tensor_compressed) == 2)
             tensor, meta = tensor_compressed
-            inter_tensors_compressed = [self.ddp.allgather(tensor, intra=True), self.ddp.allgather(meta, intra=True)]
+            if self.flat_comm:
+                inter_tensors_compressed = [self.ddp.allgather_global(tensor), self.ddp.allgather_global(meta)]
+            else:
+                inter_tensors_compressed = [self.ddp.allgather(tensor, intra=False), self.ddp.allgather(meta, intra=False)]
 
-            tensors, metadata = inter_tensors_compressed
-            if isinstance(tensors, list):
-                tensors = torch.stack(tensors).reshape(-1)
-                metadata = torch.stack(metadata).reshape(-1)
-
-            inter_tensors_compressed = [tensors, metadata]
             self.handles[name] = inter_tensors_compressed, ctx
             return [-1], (name,)
 
@@ -89,9 +85,9 @@ class DDPAllgather(Communicator):
             else:
                 decompressed_tensor = self.allgather_decompress(tensors_compressed, ctx)
 
-            if not self.flat_comm:
-                tensor = self.ddp.allgather(decompressed_tensor, intra=True)
-            else:
+            if self.flat_comm:
                 tensor = decompressed_tensor
+            else:
+                tensor = self.ddp.allgather(decompressed_tensor, intra=True)
         torch.cuda.current_stream().wait_stream(self.comm_stream)
         return tensor

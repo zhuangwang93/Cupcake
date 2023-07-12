@@ -149,7 +149,6 @@ class MemoryPool(Memory):
             self.compensate(None, name)
             offset, _ = self.compress_name[name]
             start, end = offset
-            print(name, start, end)
             return self.velocities[start:end], start
         else:
             return None, None
