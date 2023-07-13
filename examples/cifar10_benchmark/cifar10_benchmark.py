@@ -21,7 +21,6 @@ import argparse
 from utils import progress_bar
 sys.path.append("../../")
 from mergeComp_dl.torch.helper import add_parser_arguments, wrap_compress_optimizer
-from mergeComp_dl.torch.scheduler.scheduler import Scheduler
 
 
 # Benchmark settings
@@ -151,24 +150,6 @@ hvd.broadcast_optimizer_state(optimizer, root_rank=0)
 optimizer, grc = wrap_compress_optimizer(model, optimizer, args)
 scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
 
-# data for memory partition
-partition_inputs, partition_targets = None, None
-for inputs, targets in train_loader:
-    partition_inputs, partition_targets = inputs.cuda(), targets.cuda()
-    break
-
-def memory_partition():
-    optimizer.zero_grad()
-    outputs = model(partition_inputs)
-    loss = criterion(outputs, partition_targets)
-    torch.cuda.synchronize()
-    start_time = time_()
-    loss.backward()
-    optimizer.step()
-    torch.cuda.synchronize()
-
-    return time_() - start_time
-
 
 # Training
 def train(epoch):
@@ -248,18 +229,10 @@ def test(epoch):
         torch.save(state, './checkpoint/ckpt.pth')
         best_acc = acc
 
-if args.scheduler:
-    if args.scheduler_baseline:
-        grc.memory.clean()
-        grc.compressor.clean()
-        grc.memory.partition()
-    else:
-        schedule = Scheduler(grc, memory_partition, args)
 
 for epoch in range(start_epoch, start_epoch+args.epochs):
     train(epoch)
     if not args.speed_test:
         test(epoch)
-        scheduler.step()
         if args.compress:
             grc.memory.update_lr(optimizer.param_groups[0]['lr'])

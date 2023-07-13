@@ -209,9 +209,4 @@ class MemoryPool(Memory):
             p = self.param_groups[_name]
             shape = self.shapes[_name]
             tensor_updates = self.get_reduction_tensor(_name)
-            if self.fusion_num <= 1:
-                p.grad.set_(tensor_updates.view(shape))
-            else:
-                # directly update the model with the gradients in memory pool
-                # to avoid the extra overhead to call step() in optimizer()
-                p.data.add_(tensor_updates.view(shape), alpha=-self.lr)
+            p.grad.set_(tensor_updates.view(shape))

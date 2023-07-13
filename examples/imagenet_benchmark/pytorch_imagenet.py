@@ -323,16 +323,6 @@ if __name__ == '__main__':
 
     optimizer, grc = wrap_compress_optimizer(model, optimizer, args)
 
-    if args.scheduler:
-        if args.scheduler_baseline:
-            grc.memory.clean()
-            grc.compressor.clean()
-            grc.memory.partition()
-        else:
-            from mergeComp_dl.torch.scheduler.scheduler import Scheduler
-            schedule = Scheduler(grc, memory_partition, args)
-
-
     for epoch in range(0, args.epochs):
         train(epoch)
         if not args.speed_test:
