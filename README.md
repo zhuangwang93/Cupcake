@@ -21,7 +21,7 @@ If you find our project useful in your research, please consider citing:
 
 ## Prerequisites
 
-The code is built with following libraries (see [requirements.txt](requirements.txt)):
+The code is built with the following libraries (see [requirements.txt](requirements.txt)):
 - Python >= 3.7
 - [PyTorch](https://github.com/pytorch/pytorch)
 - [Horovod](https://github.com/horovod/horovod) 
@@ -37,7 +37,7 @@ The code is built with following libraries (see [requirements.txt](requirements.
 ```shell script
 # Step 1: install pytorch: https://pytorch.org/get-started/locally/
 # Step 2: install horovod
-HOROVOD_GPU_OPERATIONS=NCCL install --no-cache-dir horovod
+HOROVOD_GPU_OPERATIONS=NCCL pip install --no-cache-dir horovod
 horovodrun --check-build
 # Step 3: download Cupcake
 git clone https://github.com/zhuangwang93/Cupcake.git
@@ -45,13 +45,13 @@ git clone https://github.com/zhuangwang93/Cupcake.git
 
 
 ## Main Components
-The four main components of Cupcake framework are the `Communicator`, `Compressor`, `Memory` and `Scheduler` abstract classes.
+The four main components of Cupcake framework are the `Communicator`, `Compressor`, `Memory`, and `Scheduler` abstract classes.
 - `Communicator` implementations define the communication primitives used by Cupcake.
 - `Compressor` implementations provide different `compress` and `decompress` operations for various gradient compression algorithms.
 - `Memory` implementations provide the `partition`, `update`, `compensate` and `reduce` methods for memory.
-- `Scheduler` implementations provide the optimization scheduler for performance of training speed (obsolete).
+- `Scheduler` implementations provide the optimization scheduler for the performance of training speed (obsolete).
 
-Cupcake can support following configurations and we are extending it for more options.
+Cupcake can support the following configurations and we are extending it for more options.
 
 | Configurations | Options                                                                            |
 | -------------- | ---------------------------------------------------------------------------------- |
@@ -63,7 +63,7 @@ Cupcake can support following configurations and we are extending it for more op
 
 ### Quick start
 
-Basic benchmark is provided in `compress_benchmark.py`. 
+The primary benchmark is provided in `compress_benchmark.py`. 
 - For example, we can use the following command to run the benchmark on 4 GPUs, with compression algorithm as efsignsgd, communication primitive as allgather, memory as residual.
  ```shell script
  horovodrun -np 4 python compress_benchmark.py --compress --compressor efsignsgd --comm allgather --memory residual --fusion-num 1 --model=resnet50
@@ -73,6 +73,6 @@ Basic benchmark is provided in `compress_benchmark.py`.
 ### Standard benchmarks
 Real examples are provided under the [examples](examples) folder. We provide two kinds of benchmarks for the evaluation. The models include ResNet50 and ResNet101 on CIFAR10 and ImageNet.
 
-For CIFAR10/CIFAR100 benchmark, the model and dataset could be download automatically. There is no additional operation for CIFAR10/CIFAR100.
+For CIFAR10 benchmark, the model and dataset could be downloaded automatically. There is no additional operation for CIFAR10.
 
 For ImageNet benchmark, you need to download the ImageNet dataset for the evaluation.
