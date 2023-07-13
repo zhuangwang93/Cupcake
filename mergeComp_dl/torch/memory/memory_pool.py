@@ -21,7 +21,7 @@ class MemoryPool(Memory):
         self.shapes = {}
         self.world_size = hvd.size()
         self.local_size = hvd.size()
-        self.hierarchical = True #(self.local_size > 1) and (self.world_size > self.local_size)
+        self.hierarchical = (self.local_size > 1) and (self.world_size > self.local_size)
         self.initialize(named_parameters)
 
 

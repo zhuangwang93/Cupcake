@@ -16,7 +16,7 @@ class DDPAllgather(Communicator):
         self.world_size = hvd.size()
         self.worker_id = self.ddp.worker_id
         self.worker_num = self.ddp.worker_num
-        self.flat_comm = (self.local_size == 1) or (self.worker_num == 1) and False
+        self.flat_comm = (self.local_size == 1) or (self.worker_num == 1)
         self.comm_stream = torch.cuda.Stream()
         self.handles = {}
         self.shapes = {}
