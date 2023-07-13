@@ -16,7 +16,7 @@ class DDPAllgather(Communicator):
         self.world_size = hvd.size()
         self.worker_id = self.ddp.worker_id
         self.worker_num = self.ddp.worker_num
-        self.flat_comm = (self.local_size == 1) or (self.worker_num == 1)
+        self.flat_comm = (self.local_size == 1) or (self.worker_num == 1) and False
         self.comm_stream = torch.cuda.Stream()
         self.handles = {}
         self.shapes = {}
@@ -31,7 +31,8 @@ class DDPAllgather(Communicator):
         # Because they are compressed from the same position range, we can sum the decompressed tensors
         if self.is_topk_like:
             tensors, metadata = tensors_compressed
-            tensors, metadata = torch.stack(tensors).reshape(-1), torch.stack(metadata).reshape(-1)
+            if isinstance(tensors, list):
+                tensors, metadata = torch.stack(tensors).reshape(-1), torch.stack(metadata).reshape(-1)
             return self.compressor.decompress((tensors, metadata), ctx)
 
         tensors, metadata = tensors_compressed
@@ -91,5 +92,6 @@ class DDPAllgather(Communicator):
                 tensor = decompressed_tensor
             else:
                 tensor = self.ddp.allgather(decompressed_tensor, intra=True)
+                tensor = torch.stack(tensor).reshape(-1)
         torch.cuda.current_stream().wait_stream(self.comm_stream)
         return tensor

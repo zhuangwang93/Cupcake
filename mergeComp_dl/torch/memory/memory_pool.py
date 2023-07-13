@@ -19,15 +19,22 @@ class MemoryPool(Memory):
         self.bp_param_names = []
         self.compress_name = {}
         self.shapes = {}
-
+        self.world_size = hvd.size()
+        self.local_size = hvd.size()
+        self.hierarchical = True #(self.local_size > 1) and (self.world_size > self.local_size)
         self.initialize(named_parameters)
 
 
     def initialize(self, named_parameters):
         offset = 0
+        
         for name, p in named_parameters:
             if p.requires_grad:
                 size = p.numel()
+                # when communications are hierarchical, assume the message size of each GPU after reduce-scatter is the same
+                if self.hierarchical:
+                    assert(size % self.local_size == 0)
+                    size = size // self.local_size
                 self.grad_size += size
                 self.tensor_num += 1
                 self.param_groups[name] = p
@@ -37,16 +44,21 @@ class MemoryPool(Memory):
         self.grads = torch.zeros(offset).cuda()
         self.momentums = torch.zeros(offset).cuda()
         self.velocities = torch.zeros(offset).cuda()
-        self.reduction = torch.zeros(offset).cuda()
+        if self.hierarchical:
+            self.reduction = torch.zeros(offset * self.local_size).cuda()
+        else:
+            self.reduction = torch.zeros(offset).cuda()
 
 
     def can_partition_memory(self):
         return len(self.bp_param_names) == self.tensor_num
 
 
-    # TODO: handle local SGD
     def add_tensor(self, name, size):
         if (name, size) not in self.bp_param_names:
+            # when communications are hierarchical, assume the message size of each GPU after reduce-scatter is the same
+            if self.hierarchical:
+                size = size // self.local_size
             self.bp_param_names.append((name, size))
 
         if self.can_partition_memory():
@@ -62,7 +74,7 @@ class MemoryPool(Memory):
             offset += size
 
 
-    #partition the model with specific partition strategy
+    # partition the model with specific partition strategy
     def partition(self, partition_indices=None):
         if not self.can_partition_memory():
             print("Error: BP tensors are not initialized yet!")
@@ -95,6 +107,7 @@ class MemoryPool(Memory):
         #if hvd.rank() == 0:
             #print(self.compress_name)
 
+    # TODO: accordingly update the range of the positions for hierarchical communications
     def get_grad(self, name):
         pos, _ = self.compress_name[name]
         return self.grads[pos[0]: pos[1]]
@@ -127,12 +140,20 @@ class MemoryPool(Memory):
 
     def get_reduction(self, name):
         pos, _ = self.compress_name[name]
-        return self.reduction[pos[0]: pos[1]]
+        start, end = pos
+        if self.hierarchical:
+            start *= self.local_size
+            end *= self.local_size
+        return self.reduction[start: end]
 
 
     def get_reduction_tensor(self, name):
         pos = self.tensor_by_name[name]
-        return self.reduction[pos[0]: pos[1]]
+        start, end = pos
+        if self.hierarchical:
+            start *= self.local_size
+            end *= self.local_size
+        return self.reduction[start: end]
 
 
     @abstractmethod
@@ -159,7 +180,7 @@ class MemoryPool(Memory):
         raise NotImplemented("update was not implemented.")
 
 
-    def pool_update(self, tensor, name, compressor, tensor_compressed, ctx, merged=True):
+    def pool_update(self, tensor, name, compressor, tensor_compressed, ctx):
         """Update the residuals."""
         if tensor_compressed is None:
             return
